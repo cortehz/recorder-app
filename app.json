@@ -3,9 +3,12 @@
     "name": "recorder-app",
     "slug": "recorder-app",
     "version": "1.0.0",
-    "assetBundlePatterns": [
-      "**/*"
-    ]
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow access to microphone and camera."
+      }
+    }
   },
   "name": "recorder-app"
 }
