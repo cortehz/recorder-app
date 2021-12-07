@@ -1,15 +1,29 @@
-import React, { useState, useEffect } from "react";
-import { View, TouchableOpacity, Button, Text } from "react-native";
+import React, { useState, useEffect, useContext } from "react";
 import { Camera } from "expo-camera";
+import { View, TouchableOpacity, Button, Text, Image } from "react-native";
 import { Audio } from "expo-av";
 import RecordingAreaWrapper from "./RecordingAreaWrapper";
-import RecordingButton from "./RecordingButton";
+import { CameraContext } from "../store/CameraContext";
+import { getRecordingTimestamp, borderColor } from "../utils";
+import Svg, { Path, Rect } from "react-native-svg";
+import { CameraIcon } from "./Icons";
+import { styles } from "./VideoNote";
+
+let recording = new Audio.Recording();
 
 const AudioNote = () => {
   const [hasAudioPermission, setHasAudioPermission] = useState(null);
   const [recordingAudio, setRecordingAudio] = useState(null);
   const [recordingAudioUri, setRecordingAudioUri] = useState(null);
   const [audioSound, setAudioSound] = useState(null);
+  const [duration, setDuration] = useState(null);
+  const [metering, setMetering] = useState(null);
+  const [recordingState, setRecordingState] = useState({
+    isRecording: null,
+    recordingDuration: null,
+    ismetering2: 0,
+  });
+  const [cameraOn, setCameraOn] = useContext(CameraContext);
 
   //audio recording
   async function startRecording() {
@@ -20,10 +34,12 @@ const AudioNote = () => {
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
       });
+
       console.log("Starting recording..");
-      const { recording } = await Audio.Recording.createAsync({
-        maxDuration: 600,
+      await recording.prepareToRecordAsync({
+        maxDuration: 6,
         quality: Audio.RECORDING_OPTIONS_PRESET_HIGH_QUALITY,
+        isMeteringEnabled: true,
         android: {
           extension: ".m4a",
           outputFormat: Audio.RECORDING_OPTION_ANDROID_OUTPUT_FORMAT_MPEG_4,
@@ -43,9 +59,18 @@ const AudioNote = () => {
           linearPCMIsFloat: false,
         },
       });
-      setRecordingAudio(recording);
 
-      console.log("Recording started");
+      recording.setOnRecordingStatusUpdate(_updateScreenForRecordingStatus);
+
+      await recording.startAsync();
+      setRecordingAudio(true);
+
+      const status = await recording.getStatusAsync();
+      console.log(status);
+      if (status.isRecording) {
+        setDuration(status.durationMillis);
+        setMetering(status.metering);
+      }
     } catch (err) {
       console.error("Failed to start recording", err);
     }
@@ -53,12 +78,37 @@ const AudioNote = () => {
 
   async function stopRecording() {
     console.log("Stopping recording..");
-    setRecordingAudio(undefined);
-    await recordingAudio.stopAndUnloadAsync();
-    const uri = recordingAudio.getURI();
+    try {
+      const status = await recording.getStatusAsync();
+      console.log(status);
+      if (status.isRecording) {
+        await recording.stopAndUnloadAsync();
+        const uri = recording.getURI();
+        setRecordingAudioUri(uri);
+      }
+      // await recording.stopAndUnloadAsync();
 
-    setRecordingAudioUri(uri);
-    console.log("Recording stopped and stored at", uri);
+      setRecordingAudio(false);
+    } catch (error) {
+      console.error("Failed to stop recording", error);
+    }
+  }
+
+  async function pauseRecording() {
+    console.log("Pausing recording..");
+
+    try {
+      await recording.pauseAsync();
+      const pause = await recording.getStatusAsync();
+      setRecordingAudio(false);
+      console.log(pause);
+    } catch (error) {
+      console.log(error);
+    }
+
+    recording.getStatusAsync();
+
+    console.log("Recording paused");
   }
 
   async function playSound() {
@@ -76,6 +126,22 @@ const AudioNote = () => {
     }
   }
 
+  const _updateScreenForRecordingStatus = (status) => {
+    if (status.canRecord) {
+      setRecordingState({
+        isRecording: status.isRecording,
+        recordingDuration: status.durationMillis,
+        ismetering2: status.metering,
+      });
+    } else if (status.isDoneRecording) {
+      setRecordingState({
+        isRecording: false,
+        recordingDuration: status.durationMillis,
+        ismetering2: status.metering,
+      });
+    }
+  };
+
   useEffect(() => {
     (async () => {
       const audioStatus = await Camera.requestMicrophonePermissionsAsync();
@@ -86,28 +152,72 @@ const AudioNote = () => {
   return (
     <>
       <RecordingAreaWrapper>
-        <View style={{ width: "100%", height: "100%" }}>
+        <View
+          style={{
+            width: "100%",
+            height: "100%",
+            backgroundColor: "#ccc",
+            justifyContent: "center",
+            alignItems: "center",
+            borderWidth: `${
+              recordingState.isRecording || recordingAudioUri ? 2 : 0
+            }`,
+
+            borderColor: borderColor(
+              recordingState.isRecording,
+              recordingAudioUri
+            ),
+          }}
+        >
           <Text style={{ fontSize: 24 }}>600</Text>
         </View>
+
+        <View
+          style={{
+            position: "absolute",
+            color: "#fff",
+            right: 10,
+            top: "20%",
+          }}
+        >
+          <TouchableOpacity onPress={() => {}} style={styles.icons}>
+            <Image source={require("./assets/settings-4-line.png")} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              setCameraOn((prev) => !prev);
+            }}
+            style={styles.icon}
+          >
+            <Image source={require("./assets/video-add-line.png")} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => {
+              setCameraOn((prev) => !prev);
+            }}
+            style={styles.icons}
+          >
+            <Image source={require("./assets/mic-off-line.png")} />
+          </TouchableOpacity>
+        </View>
       </RecordingAreaWrapper>
-      {/* <TouchableOpacity
-        style={{
-          backgroundColor: "red",
-          width: "100%",
-          height: 50,
-          justifyContent: "center",
-          alignItems: "center",
-          marginTop: 20,
-        }}
-        onPress={() => {}}
-      > */}
+      <Text>{getRecordingTimestamp(recordingState.recordingDuration)}</Text>
+      <Text>
+        {recordingState.ismetering2 !== 0
+          ? recordingState.ismetering2
+          : Math.abs(recordingState.ismetering2)}
+      </Text>
+      <Svg width="100" height="10" style={{ marginTop: -10 }}>
+        <Rect width="100" height="10" fill="#ccc" rx="0" ry="0"></Rect>
+        <Rect width="20" height="10" fill="#0078bc" rx="0" ry="0"></Rect>
+      </Svg>
       <View>
         <Button
           title={recordingAudio ? "Stop Recording" : "Start Recording"}
           onPress={recordingAudio ? stopRecording : startRecording}
         />
       </View>
-      {/* </TouchableOpacity> */}
       {recordingAudioUri ? (
         <Button title="Play audio" onPress={playSound} />
       ) : null}

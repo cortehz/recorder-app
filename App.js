@@ -4,6 +4,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import Home from "./src/views/Home";
 import CreateNote from "./src/views/CreateNote";
+import { CameraProvider } from "./src/store/CameraContext";
 
 function Feed({ navigation }) {
   return (
@@ -18,16 +19,18 @@ const Drawer = createDrawerNavigator();
 
 export default function App() {
   return (
-    <NavigationContainer>
-      <Drawer.Navigator
-        // drawerContent={(props) => <CustomDrawerContent {...props} />}
+    <CameraProvider>
+      <NavigationContainer>
+        <Drawer.Navigator
+          // drawerContent={(props) => <CustomDrawerContent {...props} />}
 
-        initialRouteName="Home"
-      >
-        <Drawer.Screen name="Brand" component={Home} />
-        <Drawer.Screen name="My notes" component={Feed} />
-        <Drawer.Screen name="Create a note" component={CreateNote} />
-      </Drawer.Navigator>
-    </NavigationContainer>
+          initialRouteName="Home"
+        >
+          <Drawer.Screen name="Brand" component={Home} />
+          <Drawer.Screen name="My notes" component={Feed} />
+          <Drawer.Screen name="Create a note" component={CreateNote} />
+        </Drawer.Navigator>
+      </NavigationContainer>
+    </CameraProvider>
   );
 }
